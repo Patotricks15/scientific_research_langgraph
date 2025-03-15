@@ -5,6 +5,8 @@ from langgraph.graph import StateGraph, START, END
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_community.retrievers import ArxivRetriever
+from pylatex import Document, Section, Command
+from pylatex.utils import NoEscape
 
 load_dotenv()
 
@@ -69,6 +71,9 @@ def final_answer(state):
     answer_instructions = answer_template.format(pre_answers=pre_answers, question=question)
     final_answer_result = llm.invoke(answer_instructions)
     final_answer_text = final_answer_result.content if hasattr(final_answer_result, "content") else str(final_answer_result)
+    
+    
+    
     result = {"final_output": final_answer_text}
     return result
 
@@ -90,6 +95,31 @@ builder_arxiv.add_edge("final_answer", END)
 
 graph = builder_arxiv.compile()
     
+def generate_latex(final_output):
+    """
+    Generates a LaTeX document from the provided string and saves it to a .tex file.
+
+    Args:
+        final_output (str): The final unified answer text.
+
+    Returns:
+        None
+    """
+    doc = Document()
+
+    doc_title = 'Generated Document'
+    doc.preamble.append(Command('title', doc_title))
+    doc.preamble.append(Command('author', 'LangGraph AI'))
+    doc.preamble.append(Command('date', NoEscape(r'\today')))
+
+    doc.append(NoEscape(r'\maketitle'))
+
+    with doc.create(Section('Final Answer')):
+        doc.append(final_output)
+
+    doc.generate_tex('generated_document')
+
+    return None
 
 while True:
     question = input("Enter your question: ")
@@ -98,4 +128,5 @@ while True:
 
     final_state = graph.invoke(initial_state)    
 
-    print(graph.invoke({"question":[question]}))
+    generate_latex(graph.invoke({"question":[question]})['final_output'])
+
