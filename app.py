@@ -7,11 +7,18 @@ from langchain_openai import ChatOpenAI
 from langchain_community.retrievers import ArxivRetriever
 from pylatex import Document, Section, Command
 from pylatex.utils import NoEscape
-
+from datetime import datetime
 load_dotenv()
 
 llm = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0)
 
+def format_doc(i):
+    return (
+        "content: " + i.page_content + "\n"
+        + "published_year: " + f"{i.metadata['Published']}" + "\n"
+        + "Title: " + i.metadata['Title'] + "\n"
+        + "Authors: " + i.metadata['Authors']
+    )
 def search_arxiv(state):
     """
     Performs a search on arXiv and retrieves search results.
@@ -25,11 +32,11 @@ def search_arxiv(state):
     """
     retriever = ArxivRetriever(load_max_docs=4, get_ful_documents=True)
     docs = retriever.invoke(state['question'][0])
-    result = {"context": [i.page_content for i in docs]}
+    result = {"context": [format_doc(i) for i in docs]}
     return result
 
     
-def generate_summary(state):
+def generate_citation(state):
     """
     Generates an answer of the given question using the context provided.
 
@@ -45,7 +52,7 @@ def generate_summary(state):
     question = state['question'][0]
     answer_text = []
     for i in context:
-        answer_template = "Answer the question {question} in a summarized form using this context: {context}"
+        answer_template = "Answer the question {question} in a scientific form with correct citations using this context: {context}"
         answer_instructions = answer_template.format(question=question, context=i)
         answer = llm.invoke(answer_instructions)
         answer_text.append(answer.content if hasattr(answer, "content") else str(answer))
@@ -67,7 +74,7 @@ def final_answer(state):
 
     pre_answers = state['pre_answers']
     question = state['question'][0]
-    answer_template = "Write a final and unified answer to the question {question} following this pre-answers {pre_answers}"
+    answer_template = "Write a final and unified scientific paragraph to answer the question {question} following these pre-answers {pre_answers}. PLEASE mantain the scientific form and correct citations. At the final generate the bibliography in ABNT format."
     answer_instructions = answer_template.format(pre_answers=pre_answers, question=question)
     final_answer_result = llm.invoke(answer_instructions)
     final_answer_text = final_answer_result.content if hasattr(final_answer_result, "content") else str(final_answer_result)
@@ -85,12 +92,12 @@ class State(TypedDict):
 
 builder_arxiv = StateGraph(State)
 builder_arxiv.add_node("search_arxiv",search_arxiv)
-builder_arxiv.add_node("generate_summary",generate_summary)
+builder_arxiv.add_node("generate_citation",generate_citation)
 builder_arxiv.add_node("final_answer",final_answer)
 
 builder_arxiv.add_edge(START, "search_arxiv")
-builder_arxiv.add_edge("search_arxiv", "generate_summary")
-builder_arxiv.add_edge("generate_summary", "final_answer")
+builder_arxiv.add_edge("search_arxiv", "generate_citation")
+builder_arxiv.add_edge("generate_citation", "final_answer")
 builder_arxiv.add_edge("final_answer", END)
 
 graph = builder_arxiv.compile()
