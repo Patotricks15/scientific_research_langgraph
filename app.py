@@ -10,6 +10,8 @@ from pylatex.utils import NoEscape
 
 load_dotenv()
 
+llm = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0)
+
 def search_arxiv(state):
     """
     Performs a search on arXiv and retrieves search results.
@@ -21,7 +23,7 @@ def search_arxiv(state):
     Returns:
         dict: A dictionary containing the key 'context' with the retrieved documents.
     """
-    retriever = ArxivRetriever(load_max_docs=8, get_ful_documents=True)
+    retriever = ArxivRetriever(load_max_docs=4, get_ful_documents=True)
     docs = retriever.invoke(state['question'][0])
     result = {"context": [i.page_content for i in docs]}
     return result
@@ -39,7 +41,6 @@ def generate_summary(state):
     Returns:
         dict: A dictionary containing the key 'pre_answers' with the generated summary as its value.
     """
-    llm = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0)
     context = state['context']
     question = state['question'][0]
     answer_text = []
@@ -64,7 +65,6 @@ def final_answer(state):
         dict: A dictionary containing the key 'final_output' with the generated final answer as its value.
     """
 
-    llm = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0)
     pre_answers = state['pre_answers']
     question = state['question'][0]
     answer_template = "Write a final and unified answer to the question {question} following this pre-answers {pre_answers}"
@@ -95,7 +95,7 @@ builder_arxiv.add_edge("final_answer", END)
 
 graph = builder_arxiv.compile()
     
-def generate_latex(final_output):
+def generate_latex(input, final_output):
     """
     Generates a LaTeX document from the provided string and saves it to a .tex file.
 
@@ -107,9 +107,9 @@ def generate_latex(final_output):
     """
     doc = Document()
 
-    doc_title = 'Generated Document'
+    doc_title = input
     doc.preamble.append(Command('title', doc_title))
-    doc.preamble.append(Command('author', 'LangGraph AI'))
+    doc.preamble.append(Command('author', 'Arxiv Agent'))
     doc.preamble.append(Command('date', NoEscape(r'\today')))
 
     doc.append(NoEscape(r'\maketitle'))
@@ -117,7 +117,7 @@ def generate_latex(final_output):
     with doc.create(Section('Final Answer')):
         doc.append(final_output)
 
-    doc.generate_tex('generated_document')
+    doc.generate_tex("latex_outputs/" + input.replace(" ", "_").lower())
 
     return None
 
@@ -128,5 +128,6 @@ while True:
 
     final_state = graph.invoke(initial_state)    
 
-    generate_latex(graph.invoke({"question":[question]})['final_output'])
+    print(graph.invoke({"question":[question]})['final_output'])
 
+    generate_latex(question, graph.invoke({"question":[question]})['final_output'])
