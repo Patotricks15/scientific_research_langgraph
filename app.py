@@ -13,6 +13,15 @@ load_dotenv()
 llm = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0)
 
 def format_doc(i):
+    """
+    Formats an Arxiv document into a string format.
+
+    Args:
+        i (Document): Arxiv document
+
+    Returns:
+        str: Formatted string containing the document's content, published year, title, and authors.
+    """
     return (
         "content: " + i.page_content + "\n"
         + "published_year: " + f"{i.metadata['Published']}" + "\n"
